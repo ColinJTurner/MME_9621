@@ -114,9 +114,9 @@ frequenciesQ = sqrt(lamdaQR);
 accuracy = norm(frequenciesQ - frequenciesE) / norm(frequenciesE);
 
 disp('Natural Frequencies for Eig Function:');
-disp(frequenciesE);
+disp(num2str(frequenciesE));
 disp('Natural Frequencies for Q-R Method:');
-disp(frequenciesQ);
+disp(num2str(frequenciesQ));
 
 disp(['Computation Time for Eig Method: ', num2str(tE), ' seconds']);
 disp(['Computation Time for Q-R Function: ', num2str(tQ), ' seconds']);
