@@ -12,17 +12,29 @@ C2 = 0.01; % 0.01 F
 V = @(t) 50 * sin(2*pi*60*t);
 
 % Define initial conditions
-i0 = 0.5; % 0.5 A
-vc0 = 0; % 0 V
-i20 = 0.2; % 0.2 Initial current for the second inductor
-vc1 = 0; % 0 V
+i0 = 0.500000; % 0.5 A
+vc0 = 0.000000; % 0 V
+i20 = 0.200000; % 0.2 Initial current for the second inductor
+vc1 = 0.000000; % 0 V
 initial_conditions = [i0; vc0; i20; vc1];
 
-% Define time span
+% Finding grid independent solution
 tspan = [0 0.1]; % Solve from t=0 to t=0.1 seconds
-% h=1e-5;
-h=tspan(2)*10^-4;
-NStep = abs(tspan(1) - tspan(2)) / h;
+TOL = 1e-8;
+prev_y_rk4 = 0;
+for h = 1e-3:-1e-7:1e-7 
+    NStep = round(abs(tspan(1) - tspan(2)) / h);
+    [~,y_rk4] = Vector_RK4(@circuit_odes, tspan(1), initial_conditions, NStep, h, V, R, L1, L2, M, C1, C2);
+   tol = abs(y_rk4(20,2) - prev_y_rk4)
+    if abs(y_rk4(20,2) - prev_y_rk4) <= TOL
+        stepsize = h;
+        break
+    end
+    prev_y_rk4 = y_rk4(20,2) % Assuming 22nd time step corresponds to 0.02 seconds
+end
+comp_Independance = toc;
+NStep = round(abs(tspan(1) - tspan(2)) / stepsize);
+
 % Solve using ODE45
 tic;
 [t_ode45, y_ode45] = ode45(@(t, y) circuit_odes(t, y, V, R, L1, L2, M, C1, C2), tspan, initial_conditions);
@@ -95,6 +107,7 @@ grid on;
 figure;
 subplot(2,1,1);
 plot(t_rk4, y_rk4(:,1), 'b', t_rk4, y_rk4(:,3), 'r');
+xlim([0 tspan(2)]);
 title('Currents (RK4)');
 xlabel('Time (s)');
 ylabel('Current (A)');
@@ -103,6 +116,7 @@ grid on;
 
 subplot(2,1,2);
 plot(t_rk4, y_rk4(:,2), 'b', t_rk4, y_rk4(:,4), 'r');
+xlim([0 tspan(2)]);
 title('Capacitor Voltages (RK4)');
 xlabel('Time (s)');
 ylabel('Voltage (V)');
