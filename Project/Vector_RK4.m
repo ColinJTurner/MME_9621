@@ -1,0 +1,20 @@
+function [t_rk4, y_rk4] = Vector_RK4(ode_function, t0, Y0, NStep, h, V, R, L1, L2, M, C1, C2)
+    % Pre-allocation 
+    t_rk4 = zeros(NStep, 1);
+    y_rk4 = zeros(NStep, length(Y0));
+
+    % to store results of y1 and y2 in a singe array
+    y_rk4(1, :) = Y0; 
+    
+    % initial condition
+    t_rk4(1) = t0; 
+
+    for k = 1:NStep
+        s1 = ode_function(t_rk4(k), y_rk4(k, :), V, R, L1, L2, M, C1, C2);
+        s2 = ode_function(t_rk4(k) + h/2, y_rk4(k, :) + h/2 .* s1', V, R, L1, L2, M, C1, C2);
+        s3 = ode_function(t_rk4(k) + h/2, y_rk4(k, :) + h/2 .* s2', V, R, L1, L2, M, C1, C2);
+        s4 = ode_function(t_rk4(k) + h, y_rk4(k, :) + h .* s3', V, R, L1, L2, M, C1, C2);
+        y_rk4(k + 1, :) = y_rk4(k, :) + h * (s1/6 + s2/3 + s3/3 + s4/6)';
+        t_rk4(k + 1) = t_rk4(k) + h;
+    end
+end
