@@ -1,0 +1,14 @@
+function dydt = Circuit_ODE(t, y, V, R1, R2, L1, L2, M, C1, C2)
+    % Extract variables
+    y1 = y(1); % i1
+    y2 = y(2); % i1'
+    y3 = y(3); % i2
+    y4 = y(4); % i2'
+
+    % Define system of ODEs
+    dydt = zeros(4,1);
+    dydt(1) = y2;
+    dydt(2) = (V(t) - R1*y2 + M*dydt(4) - y1/C1)/L1;
+    dydt(3) = y4;
+    dydt(4) = (M*dydt(2) - R2*y4 - y3/C2)/L2;
+end
