@@ -1,0 +1,149 @@
+clear all; close all; clc;
+% Define circuit parameters
+R1 = 10; % 10 ohms
+R2 = 10; % 10 ohms
+L1 = 0.1; % 0.1 H
+L2 = 0.3; % 0.1 H (second inductor)
+M = 0.09; % 0-0.3 Mutual inductance (H) 
+C1 = 1; % 0.1 F
+C2 = 1; % 0.1 F
+
+% Define time varying power source
+V = @(t) -60 * cos(2*pi*60*t);
+
+% Define initial conditions
+i10 = .00100; % 0 A
+i10_prime = 0; % 0 V
+i20 = 0; % 0 Initial current for the second inductor
+i20_prime = 0; % 0 V
+initial_conditions = [i10; i10_prime; i20; i20_prime];
+
+% Finding grid independent solution
+tspan = [0 .1]; % defining timespan
+TOL = 1e-8; % 1e-10
+prev_y_rk4 = 0; % initialize valye
+tic;
+for h = 5e-4:-1e-8:1e-8
+    NStep = round(abs(tspan(1) - tspan(2)) / h);
+    [~,y_rk4] = Vector_RK4(@Circuit_ODE, tspan(1), initial_conditions...
+        , NStep, h, V, R1, R2, L1, L2, M, C1, C2);
+   %tol = abs(y_rk4(80,1) - prev_y_rk4) % Uncomment for debugging
+    if abs(y_rk4(80,1) - prev_y_rk4) <= TOL 
+        stepsize = h;
+        break
+    end
+    prev_y_rk4 = y_rk4(80,1); % Assuming 22nd time step corresponds to 0.02 seconds
+end
+comp_Independance = toc;
+NStep = round(abs(tspan(1) - tspan(2)) / stepsize); % #steps based on h
+% Solve using ODE45
+tic;
+[t_ode45, y_ode45] = ode45(@(t, y) Circuit_ODE(t, y, V, R1, R2,...
+    L1, L2, M, C1, C2), tspan, initial_conditions);
+comp_ode45 = toc;
+% Solve using ODE23tb
+tic;
+[t_ode23tb, y_ode23tb] = ode23tb(@(t, y) Circuit_ODE(t, y, V, R1, R2...
+    , L1, L2, M, C1, C2), tspan, initial_conditions);
+comp_ode15 = toc;
+% Solve using RK-4
+tic;
+[t_rk4, y_rk4] = Vector_RK4(@Circuit_ODE, tspan(1),...
+    initial_conditions, NStep, stepsize, V, R1, R2, L1, L2, M, C1, C2);
+comp_rk4 = toc;
+
+% Interpolate ODE45 solution onto ODE15s time grid
+y_ode45_interp = interp1(t_ode45, y_ode45, t_ode23tb);
+y_rk4_interp = interp1(t_rk4, y_rk4, t_ode23tb);
+
+% Calculate absolute error for ODE15s
+abs_error_ode23tb_ode45 = abs(y_ode23tb - y_ode45_interp);
+
+% Calculate absolute error for RK4
+abs_error_rk4_ode23tb = abs(y_ode23tb - y_rk4_interp);
+
+% Calculate absolute error between ODE45 and RK4
+abs_error_ode45_rk4 = abs(y_ode45_interp - y_rk4_interp);
+
+fprintf("the step size: %e\nthe number of steps: %d\n", stepsize, NStep);
+disp(['Computation Time for ode45: ', num2str(comp_ode45), ' seconds']);
+disp(['Computation Time for ode15s: ', num2str(comp_ode15), ' seconds']);
+disp(['Computation Time for rk4: ', num2str(comp_rk4), ' seconds']);
+disp(['Computation Time for Grid Independence: ', num2str(comp_Independance), ' seconds']);
+fprintf("\nthe Mean Error for ode23tb & ode45, i1, i1', i1, i1'\n");
+fprintf('Mean error for ode23tb & ode45: %e\n', max(abs_error_ode23tb_ode45));
+fprintf("\nthe Mean Error for ode23tb & rk4, i1, i1', i1, i1'\n");
+fprintf('Mean error for ode23tb & rk4: %e\n', max(abs_error_rk4_ode23tb));
+fprintf("\nthe Mean Error for ode45 & rk4, i1, i1', i1, i1'\n");
+fprintf('Mean error for ode45 & rk4: %e\n', max(abs_error_ode45_rk4));
+
+
+% Plot currents
+figure;
+plot(t_ode45, y_ode45(:,1), 'b', t_ode45, y_ode45(:,3), 'r', ...
+     t_ode23tb, y_ode23tb(:,1), 'g', t_ode23tb, y_ode23tb(:,3), 'm', ...
+     t_rk4, y_rk4(:,1), 'c', t_rk4, y_rk4(:,3), 'k');
+title('Currents');
+xlabel('Time (s)');
+ylabel('Current (A)');
+xlim([tspan(1) tspan(2)]);
+legend('ode45 i1', 'ode45 i2', 'ode23tb i1', 'ode23tb i2', 'RK4 i1', 'RK4 i2');
+grid on;
+% Insert magnified view
+left = 0.6; bottom = 0.19; width = 0.3; height = 0.2;
+axes('Position',[left, bottom, width, height]);
+plot(t_ode45, y_ode45(:,1), 'b', t_ode45, y_ode45(:,3), 'r', ...
+     t_ode23tb, y_ode23tb(:,1), 'g', t_ode23tb, y_ode23tb(:,3), 'm', ...
+     t_rk4, y_rk4(:,1), 'c', t_rk4, y_rk4(:,3), 'k');
+xlim([0.014 0.0185]);
+ylim([0.0035 0.0045]);
+
+% Plot rate of current change
+figure;
+plot(t_ode45, y_ode45(:,2), 'b', t_ode45, y_ode45(:,4), 'r', ...
+     t_ode23tb, y_ode23tb(:,2), 'g', t_ode23tb, y_ode23tb(:,4), 'm', ...
+     t_rk4, y_rk4(:,2), 'c', t_rk4, y_rk4(:,4), 'k');
+title('Rate of Current Change');
+xlabel('Time (s)');
+ylabel('Rate of Change (di/dt)');
+xlim([tspan(1) tspan(2)]);
+legend('ode45 di1/dt', 'ode45 di2/dt', 'ode23tb di1/dt', 'ode23tb di2/dt', 'RK4 di1/dt', 'RK4 di2/dt');
+grid on;
+% Insert magnified view
+left = 0.6; bottom = 0.19; width = 0.3; height = 0.2;
+axes('Position',[left, bottom, width, height]);
+plot(t_ode45, y_ode45(:,2), 'b', t_ode45, y_ode45(:,4), 'r', ...
+     t_ode23tb, y_ode23tb(:,2), 'g', t_ode23tb, y_ode23tb(:,4), 'm', ...
+     t_rk4, y_rk4(:,2), 'c', t_rk4, y_rk4(:,4), 'k');
+xlim([0.01 0.014]);
+ylim([1.49 1.69]);
+
+% Plot absolute error
+figure;
+subplot(2,1,1);
+plot(t_ode23tb, abs_error_ode23tb_ode45(:,1), 'b', t_ode23tb, abs_error_rk4_ode23tb(:,1), 'r', t_ode23tb, abs_error_ode45_rk4(:,1), 'g');
+title('Absolute Error Between Different Methods (Currents)');
+xlabel('Time (s)');
+ylabel('Absolute Error');
+legend('ODE23tb vs ODE45', 'RK4 vs ODE23tb', 'RK4 vs ODE45');
+grid on;
+
+subplot(2,1,2);
+plot(t_ode23tb, abs_error_ode23tb_ode45(:,2), 'b', t_ode23tb, abs_error_rk4_ode23tb(:,2), 'r', t_ode23tb, abs_error_ode45_rk4(:,2), 'g');
+title('Absolute Error Between Different Methods (di/dt)');
+xlabel('Time (s)');
+ylabel('Absolute Error');
+legend('ODE23tb vs ODE45', 'RK4 vs ODE23tb', 'RK4 vs ODE45');
+grid on;
+
+% Calculate voltage across R2 from the RK-4 solution
+V_R2_rk4 = L2 * y_rk4(:,3);
+
+% Plot the voltage across R2
+figure;
+plot(t_rk4, V_R2_rk4);
+xlim([tspan(1) tspan(2)]);
+xlabel('Time (s)');
+ylabel('Voltage across R2 (V)');
+title('Voltage across R2 vs. Time (RK-4)');
+grid on;
